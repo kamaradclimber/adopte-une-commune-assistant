@@ -7,8 +7,23 @@ require 'uri'
 require 'irb'
 require 'cgi'
 require 'mixlib/shellout'
+require 'ruby-cheerio'
 
 def proxy_request(uri, json_response: true)
+  response_body = get_page(uri)
+
+  if json_response
+    JSON.parse(response_body)
+  else
+    response_body
+  end
+end
+
+def kvize(hash, separator: '&')
+  hash.map { |k, v| "#{k}=#{v}" }.join(separator)
+end
+
+def get_page(uri)
   request = Net::HTTP::Get.new(uri)
   req_options = {
     use_ssl: uri.scheme == 'https'
@@ -20,15 +35,7 @@ def proxy_request(uri, json_response: true)
 
   raise "Code was #{response.code}" unless response.code.to_i == 200
 
-  if json_response
-    JSON.parse(response.body)
-  else
-    response.body
-  end
-end
-
-def kvize(hash, separator: '&')
-  hash.map { |k, v| "#{k}=#{v}" }.join(separator)
+  response.body
 end
 
 def build_clochers_org_url(lat:, lon:)
@@ -56,6 +63,20 @@ def build_clochers_org_url(lat:, lon:)
   "https://clochers.org/Fichiers_HTML/Accueil/Accueil_clochers/#{department}/accueil_#{insee_code}.htm"
 end
 
+def extract_eglise_name(url)
+  body = get_page(url)
+  j = RubyCheerio.new(body)
+
+  content_type = j.find('meta:first').first&.prop('meta', 'content') || ''
+  encoding = Regexp.last_match(1) if content_type =~ /charset=([a-z0-9-]+)/
+  encoding ||= 'utf-8'
+  puts "Detected page encoding is #{encoding}"
+  j = RubyCheerio.new(body.force_encoding(encoding).encode('utf-8'))
+
+  potential_names = j.find('center > table:first > tr:last').map { |n| n.text.strip }
+  puts "> potential names for this church is: #{potential_names.join(', ')}"
+end
+
 get '/version' do
   uri = URI.parse("http://localhost:#{ENV['JOSM_CONTROL_PORT']}/version")
   r = proxy_request(uri)
@@ -67,10 +88,11 @@ get '/load_and_zoom' do
   lon = params['left'].to_f + (params['right'].to_f - params['left'].to_f) / 2
   lat = params['bottom'].to_f + (params['top'].to_f - params['bottom'].to_f) / 2
 
-  redirect_url = build_clochers_org_url(lat: lat, lon: lon)
+  url = build_clochers_org_url(lat: lat, lon: lon)
 
-  puts "Opening #{redirect_url}"
-  Mixlib::ShellOut.new("xdg-open '#{redirect_url}'").run_command.error!
+  puts "Opening #{url}"
+  Mixlib::ShellOut.new("xdg-open '#{url}'").run_command.error!
+  extract_eglise_name(URI.parse(url))
 
   # prepare the request to proxy
   query_string = request.env['rack.request.query_string']
