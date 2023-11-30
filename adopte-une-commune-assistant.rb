@@ -6,6 +6,7 @@ require 'net/http'
 require 'uri'
 require 'irb'
 require 'cgi'
+require 'mixlib/shellout'
 
 def proxy_request(uri, json_response: true)
   request = Net::HTTP::Get.new(uri)
@@ -37,6 +38,14 @@ get '/version' do
 end
 
 get '/load_and_zoom' do
+  # open relevant urls
+  lon = params['left'].to_f + (params['right'].to_f - params['left'].to_f) / 2
+  lat = params['bottom'].to_f + (params['top'].to_f - params['bottom'].to_f) / 2
+
+  redirect_url = "https://bano.openstreetmap.fr/pifometre/clochers.html?lat=#{lat}&lon=#{lon}"
+  Mixlib::ShellOut.new("xdg-open '#{redirect_url}'").run_command.error!
+
+  # prepare the request to proxy
   query_string = request.env['rack.request.query_string']
   changeset_tags = CGI.escape(kvize({
                                       mechanical_edit: true,
@@ -50,5 +59,5 @@ get '/load_and_zoom' do
                                  }))
   query_string += "&addtags=#{object_tags}"
   uri = URI.parse("http://localhost:#{ENV['JOSM_CONTROL_PORT']}/load_and_zoom?#{query_string}")
-  proxy_request(uri, response_json: false)
+  proxy_request(uri, json_response: false)
 end
