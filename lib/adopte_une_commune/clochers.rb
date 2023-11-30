@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'json'
 require 'ruby-cheerio'
 require 'net/http'
@@ -27,22 +29,18 @@ def build_clochers_org_url(lat:, lon:)
   "https://clochers.org/Fichiers_HTML/Accueil/Accueil_clochers/#{department}/accueil_#{insee_code}.htm"
 end
 
-def extract_eglise_name(url)
-  body = get_page(url)
-  j = RubyCheerio.new(body)
-
-  content_type = j.find('meta:first').first&.prop('meta', 'content') || ''
-  encoding = Regexp.last_match(1) if content_type =~ /charset=([a-z0-9-]+)/
-  encoding ||= 'utf-8'
+# @returns [FalseClass, String] false if name detection failed, a name otherwise
+def extract_church_name(body)
+  # TODO(kamaradlimber): encoding detection does not work and always see "UTF8" which is
+  # wrong when looking at the source
+  # j = RubyCheerio.new(body)
+  # content_type = j.find('meta:first').first&.prop('meta', 'content') || ''
+  # encoding = Regexp.last_match(1) if content_type =~ /charset=([a-z0-9-]+)/
+  # encoding ||= 'utf-8'
+  encoding = 'iso-8859-1'
   puts "Detected page encoding is #{encoding}"
   j = RubyCheerio.new(body.force_encoding(encoding).encode('utf-8'))
 
-  potential_names = j.find('center > table:first > tr:last').map { |n| n.text.strip }
-  puts "> potential names for this church is: #{potential_names.join(', ')}"
-end
-
-get '/version' do
-  uri = URI.parse("http://localhost:#{ENV['JOSM_CONTROL_PORT']}/version")
-  r = proxy_request(uri)
-  r.merge({ "proxied_by": 'adopte-une-commune-assistant' }).to_json
+  potential_names = j.find('center > table:first > tr:last').map { |n| n.text.gsub('       ', '').strip }
+  potential_names.first if potential_names.one?
 end

@@ -1,4 +1,5 @@
 #!/usr/bin/env ruby
+# frozen_string_literal: true
 
 require 'sinatra'
 require 'json'
@@ -39,17 +40,25 @@ def get_page(uri)
   response.body
 end
 
+get '/version' do
+  uri = URI.parse("http://localhost:#{ENV.fetch('JOSM_CONTROL_PORT', nil)}/version")
+  r = proxy_request(uri)
+  r.merge({ proxied_by: 'adopte-une-commune-assistant' }).to_json
+end
 
 get '/load_and_zoom' do
   # open relevant urls
-  lon = params['left'].to_f + (params['right'].to_f - params['left'].to_f) / 2
-  lat = params['bottom'].to_f + (params['top'].to_f - params['bottom'].to_f) / 2
+  lon = params['left'].to_f + ((params['right'].to_f - params['left'].to_f) / 2)
+  lat = params['bottom'].to_f + ((params['top'].to_f - params['bottom'].to_f) / 2)
 
   url = build_clochers_org_url(lat: lat, lon: lon)
 
   puts "Opening #{url}"
   Mixlib::ShellOut.new("xdg-open '#{url}'").run_command.error!
-  extract_eglise_name(URI.parse(url))
+
+  body = get_page(URI.parse(url))
+  church_name = extract_church_name(body)
+  puts "> Church name is #{church_name}"
 
   # prepare the request to proxy
   query_string = request.env['rack.request.query_string']
@@ -64,6 +73,6 @@ get '/load_and_zoom' do
                                    'source:name': 'clochers.org'
                                  }))
   query_string += "&addtags=#{object_tags}"
-  uri = URI.parse("http://localhost:#{ENV['JOSM_CONTROL_PORT']}/load_and_zoom?#{query_string}")
+  uri = URI.parse("http://localhost:#{ENV.fetch('JOSM_CONTROL_PORT', nil)}/load_and_zoom?#{query_string}")
   proxy_request(uri, json_response: false)
 end
