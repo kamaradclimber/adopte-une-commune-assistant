@@ -47,6 +47,10 @@ get '/version' do
 end
 
 get '/load_and_zoom' do
+  object_tags_hash = {
+    'source:name': 'clochers.org'
+  }
+
   # open relevant urls
   lon = params['left'].to_f + ((params['right'].to_f - params['left'].to_f) / 2)
   lat = params['bottom'].to_f + ((params['top'].to_f - params['bottom'].to_f) / 2)
@@ -58,7 +62,14 @@ get '/load_and_zoom' do
 
   body = get_page(URI.parse(url))
   church_name = extract_church_name(body)
-  puts "> Church name is #{church_name}"
+  if church_name
+    puts "> Church name is #{church_name}"
+    object_tags_hash['name'] = church_name
+  else
+    puts '----------------------------------------------'
+    puts '           WARNING: no church name detected   '
+    puts '----------------------------------------------'
+  end
 
   # prepare the request to proxy
   query_string = request.env['rack.request.query_string']
@@ -68,10 +79,9 @@ get '/load_and_zoom' do
                                       'script:version': '0.1.0',
                                       'script:source': 'https://github.com/kamaradclimber/adopte-une-commune-assistant'
                                     }, separator: '|'))
+  object_tags = CGI.escape(kvize(object_tags_hash, separator: '|'))
+
   query_string += "&changeset_tags=#{changeset_tags}"
-  object_tags = CGI.escape(kvize({
-                                   'source:name': 'clochers.org'
-                                 }))
   query_string += "&addtags=#{object_tags}"
   uri = URI.parse("http://localhost:#{ENV.fetch('JOSM_CONTROL_PORT', nil)}/load_and_zoom?#{query_string}")
   proxy_request(uri, json_response: false)
