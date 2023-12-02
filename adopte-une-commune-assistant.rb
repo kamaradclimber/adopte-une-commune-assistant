@@ -11,7 +11,8 @@ require 'mixlib/shellout'
 
 require_relative 'lib/adopte_une_commune/clochers'
 
-def proxy_request(uri, json_response: true)
+def proxy_request(headers, uri, json_response: true)
+  headers['Access-Control-Allow-Origin'] = 'https://maproulette.org'
   response_body = get_page(uri)
 
   if json_response
@@ -42,7 +43,7 @@ end
 
 get '/version' do
   uri = URI.parse("http://localhost:#{ENV.fetch('JOSM_CONTROL_PORT', nil)}/version")
-  r = proxy_request(uri)
+  r = proxy_request(headers, uri)
   r.merge({ proxied_by: 'adopte-une-commune-assistant' }).to_json
 end
 
@@ -84,5 +85,5 @@ get '/load_and_zoom' do
   query_string += "&changeset_tags=#{changeset_tags}"
   query_string += "&addtags=#{object_tags}"
   uri = URI.parse("http://localhost:#{ENV.fetch('JOSM_CONTROL_PORT', nil)}/load_and_zoom?#{query_string}")
-  proxy_request(uri, json_response: false)
+  proxy_request(headers, uri, json_response: false)
 end
