@@ -11,6 +11,8 @@ require 'mixlib/shellout'
 
 require_relative 'lib/adopte_une_commune/clochers'
 
+SCRIPT_VERSION = Mixlib::ShellOut.new('git describe --tags --dirty').run_command.tap(&:error!).stdout
+
 def proxy_request(headers, uri, json_response: true)
   headers['Access-Control-Allow-Origin'] = 'https://maproulette.org'
   response_body = get_page(uri)
@@ -84,7 +86,7 @@ get '/load_and_zoom' do
   changeset_tags = CGI.escape(kvize({
                                       mechanical_edit: true,
                                       'script:name': 'adopte-une-commune-assistant',
-                                      'script:version': '0.1.0',
+                                      'script:version': SCRIPT_VERSION,
                                       'script:source': 'https://github.com/kamaradclimber/adopte-une-commune-assistant'
                                     }, separator: '|'))
   object_tags = CGI.escape(kvize(object_tags_hash, separator: '|'))
