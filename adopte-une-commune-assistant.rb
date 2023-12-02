@@ -69,8 +69,8 @@ get '/load_and_zoom' do
     puts '           WARNING: no church name detected   '
     puts '----------------------------------------------'
   when 1
-    puts "> Church name is #{church_name}"
-    object_tags_hash['name'] = church_name
+    puts "> Church name is #{church_names.first}"
+    object_tags_hash['name'] = church_names.first
   else
     puts 'WARNING: Several building detected, you have to pick the correct one manually'
     puts 'Names are:'
