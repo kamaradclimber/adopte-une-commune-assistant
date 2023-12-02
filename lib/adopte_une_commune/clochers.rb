@@ -29,8 +29,8 @@ def build_clochers_org_url(lat:, lon:)
   "https://clochers.org/Fichiers_HTML/Accueil/Accueil_clochers/#{department}/accueil_#{insee_code}.htm"
 end
 
-# @returns [FalseClass, String] false if name detection failed, a name otherwise
-def extract_church_name(body)
+# @returns Array<String> detected names
+def extract_church_names(body)
   # TODO(kamaradlimber): encoding detection does not work and always see "UTF8" which is
   # wrong when looking at the source
   # j = RubyCheerio.new(body)
@@ -41,6 +41,20 @@ def extract_church_name(body)
   puts "Detected page encoding is #{encoding}"
   j = RubyCheerio.new(body.force_encoding(encoding).encode('utf-8'))
 
-  potential_names = j.find('center > table:first > tr:last').map { |n| n.text.gsub('       ', '').strip }
-  potential_names.first if potential_names.one?
+  others = j.find('center > table:first > tr:last > td > div > font > a').map(&:text)
+  potential_names = if others.any?
+                      j.find('center > table:first > tr:last > td > div > font > strong').map(&:text)
+                    else
+                      j.find('center > table:first > tr:last').map(&:text)
+                    end
+  (potential_names + others).map { |text| clean(text) }
+end
+
+def clean(text)
+  text
+    .gsub("\n", ' ')
+    .gsub('  ', ' ') # weird characters?
+    .gsub(/ +/, ' ')
+    .strip
+    .chomp(' -') # end of first name when multiple buildings
 end

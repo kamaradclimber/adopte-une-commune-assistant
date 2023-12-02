@@ -62,14 +62,21 @@ get '/load_and_zoom' do
   Mixlib::ShellOut.new("xdg-open '#{url}'").run_command.error!
 
   body = get_page(URI.parse(url))
-  church_name = extract_church_name(body)
-  if church_name
-    puts "> Church name is #{church_name}"
-    object_tags_hash['name'] = church_name
-  else
+  church_names = extract_church_names(body)
+  case church_names.size
+  when 0
     puts '----------------------------------------------'
     puts '           WARNING: no church name detected   '
     puts '----------------------------------------------'
+  when 1
+    puts "> Church name is #{church_name}"
+    object_tags_hash['name'] = church_name
+  else
+    puts 'WARNING: Several building detected, you have to pick the correct one manually'
+    puts 'Names are:'
+    church_names.each do |n|
+      puts "- #{n}"
+    end
   end
 
   # prepare the request to proxy
