@@ -86,7 +86,7 @@ get '/load_and_zoom' do
   changeset_tags = CGI.escape(kvize({
                                       mechanical_edit: true,
                                       'script:name': 'adopte-une-commune-assistant',
-                                      'script:version': SCRIPT_VERSION,
+                                      # 'script:version': SCRIPT_VERSION,
                                       'script:source': 'https://github.com/kamaradclimber/adopte-une-commune-assistant'
                                     }, separator: '|'))
   object_tags = CGI.escape(kvize(object_tags_hash, separator: '|'))
