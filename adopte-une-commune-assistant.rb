@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+ENV["PORT"] ||= "8111"
+
 require 'sinatra'
 require 'json'
 require 'net/http'
