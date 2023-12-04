@@ -5,7 +5,10 @@ It is a prototype that acts as a proxy between maproulette.org and JOSM editor. 
 
 # Run it:
 
-- make sure JOSM remote control listens on port 8112 (instead of 8111)
+- make sure you use the cloned git repository
+- make sure JOSM remote control listens on port 8112 (instead of 8111):
+  - open josm preferences, "Advanced preference"
+  - set `remote.control.port` to 8112
 - install dependencies: `bundle install`
 - run `JOSM_CONTROL_PORT=8112 PORT=8111 bundle exec ruby adopte-une-commune-assistant.rb`
 
