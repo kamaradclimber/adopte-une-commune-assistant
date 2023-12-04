@@ -12,6 +12,7 @@ require 'mixlib/shellout'
 require_relative 'lib/adopte_une_commune/clochers'
 
 SCRIPT_VERSION = Mixlib::ShellOut.new('git describe --tags --dirty').run_command.tap(&:error!).stdout
+CONTROL_PORT = ENV.fetch("JOSM_CONTROL_PORT", 8112).to_i
 
 def proxy_request(headers, uri, json_response: true)
   headers['Access-Control-Allow-Origin'] = 'https://maproulette.org'
@@ -43,8 +44,9 @@ def get_page(uri)
   response.body
 end
 
+
 get '/version' do
-  uri = URI.parse("http://localhost:#{ENV.fetch('JOSM_CONTROL_PORT', nil)}/version")
+  uri = URI.parse("http://localhost:#{CONTROL_PORT}/version")
   r = proxy_request(headers, uri)
   r.merge({ proxied_by: 'adopte-une-commune-assistant' }).to_json
 end
@@ -93,6 +95,6 @@ get '/load_and_zoom' do
 
   query_string += "&changeset_tags=#{changeset_tags}"
   query_string += "&addtags=#{object_tags}"
-  uri = URI.parse("http://localhost:#{ENV.fetch('JOSM_CONTROL_PORT', nil)}/load_and_zoom?#{query_string}")
+  uri = URI.parse("http://localhost:#{CONTROL_PORT}/load_and_zoom?#{query_string}")
   proxy_request(headers, uri, json_response: false)
 end
