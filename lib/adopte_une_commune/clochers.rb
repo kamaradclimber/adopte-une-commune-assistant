@@ -4,6 +4,19 @@ require 'json'
 require 'ruby-cheerio'
 require 'net/http'
 
+class Church
+  attr_accessor :name, :ref_clochers_org, :building_type
+end
+
+def enrich_building(church)
+  church.building_type = case church.name
+                         when /eglise/i
+                           'church'
+                         when /chapelle/i
+                           'chapel'
+                         end
+end
+
 def build_clochers_org_url(lat:, lon:)
   # This method is doing an emulation of "https://bano.openstreetmap.fr/pifometre/clochers.html?lat=#{lat}&lon=#{lon}"
   raise ArgumentError("lat #{lat} must be within (-90..90)") unless (-90..90).include?(lat.round(0))
@@ -29,8 +42,8 @@ def build_clochers_org_url(lat:, lon:)
   "https://clochers.org/Fichiers_HTML/Accueil/Accueil_clochers/#{department}/accueil_#{insee_code}.htm"
 end
 
-# @returns Array<String> detected names
-def extract_church_names(body)
+# @returns Array<Church> detected names
+def extract_churches(uri, body)
   # TODO(kamaradlimber): encoding detection does not work and always see "UTF8" which is
   # wrong when looking at the source
   # j = RubyCheerio.new(body)
@@ -42,12 +55,25 @@ def extract_church_names(body)
   j = RubyCheerio.new(body.force_encoding(encoding).encode('utf-8'))
 
   others = j.find('center > table:first > tr:last > td > div > font > a').map(&:text)
-  potential_names = if others.any?
-                      j.find('center > table:first > tr:last > td > div > font > strong').map(&:text)
-                    else
-                      j.find('center > table:first > tr:last').map(&:text)
-                    end
-  (potential_names + others).map { |text| clean(text) }
+  church = Church.new
+  if others.any?
+    church.name = clean(j.find('center > table:first > tr:last > td > div > font > strong').map(&:text).first)
+  else
+    names = j.find('center > table:first > tr:last').map(&:text)
+    if names.any?
+      church.name = clean(names.first)
+      enrich_building(church)
+    else
+      church = nil
+    end
+    church.ref_clochers_org = Regexp.last_match(1) if church && uri.path =~ %r{/accueil_([^/]+).htm}
+  end
+  Array(church) + others.map do |text|
+    Church.new.tap do |c|
+      c.name = clean(text)
+      enrich_building(church)
+    end
+  end
 end
 
 def clean(text)

@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-ENV["PORT"] ||= "8111"
+ENV['PORT'] ||= '8111'
 
 require 'sinatra'
 require 'json'
@@ -12,9 +12,10 @@ require 'cgi'
 require 'mixlib/shellout'
 
 require_relative 'lib/adopte_une_commune/clochers'
+require_relative 'lib/adopte_une_commune/osm'
 
 SCRIPT_VERSION = Mixlib::ShellOut.new('git describe --tags --dirty').run_command.tap(&:error!).stdout
-CONTROL_PORT = ENV.fetch("JOSM_CONTROL_PORT", 8112).to_i
+CONTROL_PORT = ENV.fetch('JOSM_CONTROL_PORT', 8112).to_i
 
 def proxy_request(headers, uri, json_response: true)
   headers['Access-Control-Allow-Origin'] = 'https://maproulette.org'
@@ -46,7 +47,6 @@ def get_page(uri)
   response.body
 end
 
-
 get '/version' do
   uri = URI.parse("http://localhost:#{CONTROL_PORT}/version")
   r = proxy_request(headers, uri)
@@ -67,22 +67,48 @@ get '/load_and_zoom' do
   puts "Opening #{url}"
   Mixlib::ShellOut.new("xdg-open '#{url}'").run_command.error!
 
-  body = get_page(URI.parse(url))
-  church_names = extract_church_names(body)
-  case church_names.size
+  uri = URI.parse(url)
+  body = get_page(uri)
+  churches = extract_churches(uri, body)
+  case churches.size
   when 0
     puts '----------------------------------------------'
     puts '           WARNING: no church name detected   '
     puts '----------------------------------------------'
   when 1
-    puts "> Church name is #{church_names.first}"
-    object_tags_hash['name'] = church_names.first
+    puts "> Church name is #{churches.first}"
+    object_tags_hash['name'] = churches.first.name
+    object_tags_hash['ref:clochers.org'] = churches.first.ref_clochers_org if churches.first.ref_clochers_org
+    case churches.first.name
+    when /chapelle/e
+      object_tags_hash['building'] = 'chapel'
+    when /eglise/e
+      object_tags_hash['building'] = 'church'
+    end
   else
     puts 'WARNING: Several building detected, you have to pick the correct one manually'
     puts 'Names are:'
-    church_names.each do |n|
-      puts "- #{n}"
+    churches.each do |n|
+      puts "- #{n.name}"
     end
+
+    puts 'Fetching data from OSM'
+    way_id = Regexp.last_match(1) if params['select'] =~ /^way(\d+)$/
+
+    result = OSM.new.fetch_way(way_id)
+    if result['elements'].one?
+      tags = result['elements'].first['tags']
+      by_type = churches.group_by(&:building_type)
+      if by_type[tags['building']]&.one?
+        church = by_type[tags['building']].first
+        puts "There is a single building of type #{tags['building']} in this locality, guessing name is #{church.name}"
+        object_tags_hash['name'] = church.name
+      end
+
+    else
+      puts "Found #{result['elements'].size} results corresponding to way #{way_id}, that's weird, would have expected exactly 1 result"
+    end
+
   end
 
   # prepare the request to proxy
@@ -91,6 +117,7 @@ get '/load_and_zoom' do
                                       mechanical_edit: true,
                                       'script:name': 'adopte-une-commune-assistant',
                                       # 'script:version': SCRIPT_VERSION,
+                                      'script:version': '0.2.1',
                                       'script:source': 'https://github.com/kamaradclimber/adopte-une-commune-assistant'
                                     }, separator: '|'))
   object_tags = CGI.escape(kvize(object_tags_hash, separator: '|'))
