@@ -80,9 +80,9 @@ get '/load_and_zoom' do
     object_tags_hash['name'] = churches.first.name
     object_tags_hash['ref:clochers.org'] = churches.first.ref_clochers_org if churches.first.ref_clochers_org
     case churches.first.name
-    when /chapelle/e
+    when /chapelle/i
       object_tags_hash['building'] = 'chapel'
-    when /eglise/e
+    when /eglise/i
       object_tags_hash['building'] = 'church'
     end
   else
