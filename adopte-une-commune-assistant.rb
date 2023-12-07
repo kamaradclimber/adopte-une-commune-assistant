@@ -103,6 +103,7 @@ get '/load_and_zoom' do
         church = by_type[tags['building']].first
         puts "There is a single building of type #{tags['building']} in this locality, guessing name is #{church.name}"
         object_tags_hash['name'] = church.name
+        object_tags_hash['ref:clochers.org'] = church.ref_clochers_org if church.ref_clochers_org
       end
 
     else
