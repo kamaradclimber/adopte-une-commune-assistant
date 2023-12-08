@@ -82,14 +82,14 @@ get '/load_and_zoom' do
     case churches.first.name
     when /chapelle/i
       object_tags_hash['building'] = 'chapel'
-    when /eglise/i
+    when /eglise/i, /église/i
       object_tags_hash['building'] = 'church'
     end
   else
     puts 'WARNING: Several building detected, you have to pick the correct one manually'
     puts 'Names are:'
     churches.each do |n|
-      puts "- #{n.name}"
+      puts "- #{n.name} (type: #{n.building_type}, ref #{n.ref_clochers_org})"
     end
 
     puts 'Fetching data from OSM'
@@ -104,6 +104,8 @@ get '/load_and_zoom' do
         puts "There is a single building of type #{tags['building']} in this locality, guessing name is #{church.name}"
         object_tags_hash['name'] = church.name
         object_tags_hash['ref:clochers.org'] = church.ref_clochers_org if church.ref_clochers_org
+      else
+        puts "Found #{by_type[tags['building']]&.size || 0} building of type #{tags['building']}"
       end
 
     else

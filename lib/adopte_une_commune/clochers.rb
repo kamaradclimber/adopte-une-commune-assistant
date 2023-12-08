@@ -10,7 +10,7 @@ end
 
 def enrich_building(church)
   church.building_type = case church.name
-                         when /eglise/i
+                         when /eglise/i, /église/i
                            'church'
                          when /chapelle/i
                            'chapel'
@@ -66,8 +66,8 @@ def extract_churches(uri, body)
     else
       church = nil
     end
-    church.ref_clochers_org = Regexp.last_match(1) if church && uri.path =~ %r{/accueil_([^/]+).htm}
   end
+  church.ref_clochers_org = Regexp.last_match(1) if church && uri.path =~ %r{/accueil_([^/]+).htm}
   Array(church) + others.map do |text|
     Church.new.tap do |c|
       c.name = clean(text)
