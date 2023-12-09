@@ -14,6 +14,7 @@ RSpec.describe 'clochers' do
     end
 
     context 'when there are multiple related cities' do
+      let(:fake_uri) { URI.parse('https://clochers.org/Fichiers_HTML/Accueil/Accueil_clochers/71/accueil_71294.htm') }
       pending 'works' do
         body = File.read(File.join(__dir__, 'multi_communes.htm'))
         expect(extract_churches(fake_uri, body).map(&:name)).to eq ['...']

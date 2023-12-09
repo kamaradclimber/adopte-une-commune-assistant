@@ -55,20 +55,22 @@ def extract_churches(uri, body)
   j = RubyCheerio.new(body.force_encoding(encoding).encode('utf-8'))
   churches = []
 
-  others = j.find('center > table:first > tr:last > td > div > font > a').map(&:text)
+  others = j.find('center > table:first > tr:last > td > div > font > a')
   if others.any?
     church = Church.new
     church.name = clean(j.find('center > table:first > tr:last > td > div > font > strong').map(&:text).first)
     church.ref_clochers_org = Regexp.last_match(1) if church && uri.path =~ %r{/accueil_([^/]+).htm}
+    enrich_building(church)
     churches << church
-    others.each do |text|
+    others.each do |item|
       churches << Church.new.tap do |c|
-        c.name = clean(text)
-        enrich_building(church)
+        c.name = clean(item.text)
+        c.ref_clochers_org = Regexp.last_match(1) if item.prop('a', 'href') =~ %r{accueil_([^/]+).htm}
+        enrich_building(c)
       end
     end
   else
-    names = j.find('center > table:first > tr:last').map(&:text)
+    names = j.find('center > table:first > tr:last > a').map(&:text)
     if names.any? # there is a single building on that page
       church = Church.new
       church.name = clean(names.first)

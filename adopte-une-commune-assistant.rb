@@ -93,7 +93,12 @@ get '/load_and_zoom' do
     result = OSM.new.fetch_way(way_id)
     if result['elements'].one?
       tags = result['elements'].first['tags']
-      by_type = churches.group_by(&:building_type)
+      by_type = if tags['building'] == 'yes'
+                  # when we don't know the type of building, select all of them
+                  { 'yes' => churches }
+                else
+                  churches.group_by(&:building_type)
+                end
       if by_type[tags['building']]&.one?
         church = by_type[tags['building']].first
         puts "There is a single building of type #{tags['building']} in this locality, guessing name is #{church.name}"
@@ -118,7 +123,8 @@ get '/load_and_zoom' do
     uri = URI.parse("http://localhost:#{CONTROL_PORT}/load_and_zoom?#{query_string}")
     proxy_request(headers, uri, json_response: false)
     puts "Please select amongst the #{churches.size} possibilities"
-    selected_name = `echo -e "#{churches.map(&:name).join("\n")}" | fzf`
+    selected_name = `echo -n -e "#{churches.map(&:name).join("\n")}" | fzf`.strip
+    puts "Selected '#{selected_name}'"
     church = churches.find { |c| c.name == selected_name }
   end
 
