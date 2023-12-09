@@ -70,21 +70,15 @@ get '/load_and_zoom' do
   uri = URI.parse(url)
   body = get_page(uri)
   churches = extract_churches(uri, body)
+  church = nil
   case churches.size
   when 0
     puts '----------------------------------------------'
     puts '           WARNING: no church name detected   '
     puts '----------------------------------------------'
   when 1
-    puts "> Church name is #{churches.first}"
-    object_tags_hash['name'] = churches.first.name
-    object_tags_hash['ref:clochers.org'] = churches.first.ref_clochers_org if churches.first.ref_clochers_org
-    case churches.first.name
-    when /chapelle/i
-      object_tags_hash['building'] = 'chapel'
-    when /eglise/i, /église/i
-      object_tags_hash['building'] = 'church'
-    end
+    puts "> Church name is #{churches.first.name}"
+    church = churches.first
   else
     puts 'WARNING: Several building detected, you have to pick the correct one manually'
     puts 'Names are:'
@@ -102,8 +96,6 @@ get '/load_and_zoom' do
       if by_type[tags['building']]&.one?
         church = by_type[tags['building']].first
         puts "There is a single building of type #{tags['building']} in this locality, guessing name is #{church.name}"
-        object_tags_hash['name'] = church.name
-        object_tags_hash['ref:clochers.org'] = church.ref_clochers_org if church.ref_clochers_org
       else
         puts "Found #{by_type[tags['building']]&.size || 0} building of type #{tags['building']}"
       end
@@ -111,7 +103,26 @@ get '/load_and_zoom' do
     else
       puts "Found #{result['elements'].size} results corresponding to way #{way_id}, that's weird, would have expected exactly 1 result"
     end
+  end
 
+  if church.nil?
+    puts "Please select amongst the #{churches.size} possibilities"
+    selected_name = `echo -e "#{churches.map(&:name).join("\n")}" | fzf`
+    church = churches.find { |c| c.name == selected_name }
+  end
+
+  if church.nil?
+    puts 'We could really not find any result'
+    proxy_request(headers, uri, json_response: false)
+  else
+    object_tags_hash['name'] = church.name
+    object_tags_hash['ref:clochers.org'] = church.ref_clochers_org if church.ref_clochers_org
+    case church.name
+    when /chapelle/i
+      object_tags_hash['building'] = 'chapel'
+    when /eglise/i, /église/i
+      object_tags_hash['building'] = 'church'
+    end
   end
 
   # prepare the request to proxy
