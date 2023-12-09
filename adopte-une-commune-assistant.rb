@@ -18,6 +18,11 @@ require_relative 'lib/adopte_une_commune/osm'
 SCRIPT_VERSION = Mixlib::ShellOut.new('git describe --tags --dirty').run_command.tap(&:error!).stdout
 CONTROL_PORT = ENV.fetch('JOSM_CONTROL_PORT', 8112).to_i
 
+if Mixlib::ShellOut.new('which fzf').run_command.error?
+  puts 'You need to install fzf binary'
+  exit(1)
+end
+
 def proxy_request(headers, uri, json_response: true)
   headers['Access-Control-Allow-Origin'] = 'https://maproulette.org'
   response_body = get_page(uri)
