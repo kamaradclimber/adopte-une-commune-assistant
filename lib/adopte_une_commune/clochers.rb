@@ -53,27 +53,42 @@ def extract_churches(uri, body)
   encoding = 'iso-8859-1'
   puts "Detected page encoding is #{encoding}"
   j = RubyCheerio.new(body.force_encoding(encoding).encode('utf-8'))
+  churches = []
 
   others = j.find('center > table:first > tr:last > td > div > font > a').map(&:text)
-  church = Church.new
   if others.any?
+    church = Church.new
     church.name = clean(j.find('center > table:first > tr:last > td > div > font > strong').map(&:text).first)
+    church.ref_clochers_org = Regexp.last_match(1) if church && uri.path =~ %r{/accueil_([^/]+).htm}
+    churches << church
+    others.each do |text|
+      churches << Church.new.tap do |c|
+        c.name = clean(text)
+        enrich_building(church)
+      end
+    end
   else
     names = j.find('center > table:first > tr:last').map(&:text)
-    if names.any?
+    if names.any? # there is a single building on that page
+      church = Church.new
       church.name = clean(names.first)
       enrich_building(church)
+      church.ref_clochers_org = Regexp.last_match(1) if church && uri.path =~ %r{/accueil_([^/]+).htm}
+      churches << church
     else
-      church = nil
+      # there are many buildings on that page
+      items = j.find('table:last > tr > td > font > a')
+      items.each do |item|
+        c = Church.new
+        c.ref_clochers_org = Regexp.last_match(1) if item.prop('a', 'href') =~ %r{accueil_([^/]+).htm}
+        c.name = clean(item.text)
+        enrich_building(c)
+        churches << c
+      end
     end
   end
-  church.ref_clochers_org = Regexp.last_match(1) if church && uri.path =~ %r{/accueil_([^/]+).htm}
-  Array(church) + others.map do |text|
-    Church.new.tap do |c|
-      c.name = clean(text)
-      enrich_building(church)
-    end
-  end
+  puts 'Could really not find any church description on the page' if churches.empty?
+  churches
 end
 
 def clean(text)
@@ -81,6 +96,8 @@ def clean(text)
     .gsub("\n", ' ')
     .gsub('  ', ' ') # weird characters?
     .gsub(/ +/, ' ')
+    .gsub(/ \(.+\)/, '') # remove sub locality name
+    .gsub(/, .+/, '') # remove precision like "désaffectée"
     .strip
     .chomp(' -') # end of first name when multiple buildings
 end

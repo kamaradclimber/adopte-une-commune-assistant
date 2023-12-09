@@ -1,4 +1,5 @@
 #!/usr/bin/env ruby
+
 # frozen_string_literal: true
 
 ENV['PORT'] ||= '8111'
@@ -100,12 +101,22 @@ get '/load_and_zoom' do
         puts "Found #{by_type[tags['building']]&.size || 0} building of type #{tags['building']}"
       end
 
+      # case with wikidata data, will allow to confirm name
+      if tags.key?('wikidata')
+        wikidata_url = "https://www.wikidata.org/wiki/#{tags['wikidata']}"
+        Mixlib::ShellOut.new("xdg-open '#{wikidata_url}'").run_command.error!
+      end
+
     else
       puts "Found #{result['elements'].size} results corresponding to way #{way_id}, that's weird, would have expected exactly 1 result"
+      raise AssertionError, 'Impossible situation'
     end
   end
 
-  if church.nil?
+  if church.nil? && churches.any?
+    query_string = request.env['rack.request.query_string']
+    uri = URI.parse("http://localhost:#{CONTROL_PORT}/load_and_zoom?#{query_string}")
+    proxy_request(headers, uri, json_response: false)
     puts "Please select amongst the #{churches.size} possibilities"
     selected_name = `echo -e "#{churches.map(&:name).join("\n")}" | fzf`
     church = churches.find { |c| c.name == selected_name }
@@ -113,7 +124,6 @@ get '/load_and_zoom' do
 
   if church.nil?
     puts 'We could really not find any result'
-    proxy_request(headers, uri, json_response: false)
   else
     object_tags_hash['name'] = church.name
     object_tags_hash['ref:clochers.org'] = church.ref_clochers_org if church.ref_clochers_org
