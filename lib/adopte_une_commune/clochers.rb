@@ -3,6 +3,7 @@
 require 'json'
 require 'ruby-cheerio'
 require 'net/http'
+require_relative 'helpers'
 
 class Church
   attr_accessor :name, :ref_clochers_org, :building_type
@@ -18,27 +19,10 @@ def enrich_building(church)
 end
 
 def build_clochers_org_url(lat:, lon:)
-  # This method is doing an emulation of "https://bano.openstreetmap.fr/pifometre/clochers.html?lat=#{lat}&lon=#{lon}"
-  raise ArgumentError("lat #{lat} must be within (-90..90)") unless (-90..90).include?(lat.round(0))
-  raise ArgumentError("lon #{lat} must be within (-180..180)") unless (-180..180).include?(lon.round(0))
+  insee_data = Insee.new.get_insee_data(lat: lat, lon: lon)
+  department = insee_data[:department]
+  insee_code = insee_data[:insee_code]
 
-  uri = URI.parse("https://bano.openstreetmap.fr/pifometre/insee_from_coords.py?lat=#{lat}&lon=#{lon}")
-  request = Net::HTTP::Get.new(uri)
-  req_options = {
-    use_ssl: uri.scheme == 'https'
-  }
-
-  response = Net::HTTP.start(uri.hostname, uri.port, req_options) do |http|
-    http.request(request)
-  end
-  raise "Invalid code when querying insee code: #{response.code}" unless response.code.to_i == 200
-
-  insee_code = JSON.parse(response.body)[0][0]
-  department = if insee_code =~ /^97/
-                 insee_code[0...3]
-               else
-                 insee_code[0...2]
-               end
   "https://clochers.org/Fichiers_HTML/Accueil/Accueil_clochers/#{department}/accueil_#{insee_code}.htm"
 end
 
@@ -70,7 +54,7 @@ def extract_churches(uri, body)
       end
     end
   else
-    names = j.find('center > table:first > tr:last > a').map(&:text)
+    names = j.find('center > table:first > tr:last').map(&:text)
     if names.any? # there is a single building on that page
       church = Church.new
       church.name = clean(names.first)

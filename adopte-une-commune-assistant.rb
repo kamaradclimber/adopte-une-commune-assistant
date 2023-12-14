@@ -14,6 +14,7 @@ require 'mixlib/shellout'
 
 require_relative 'lib/adopte_une_commune/clochers'
 require_relative 'lib/adopte_une_commune/osm'
+require_relative 'lib/adopte_une_commune/helpers'
 
 SCRIPT_VERSION = Mixlib::ShellOut.new('git describe --tags --dirty').run_command.tap(&:error!).stdout
 CONTROL_PORT = ENV.fetch('JOSM_CONTROL_PORT', 8112).to_i
@@ -60,6 +61,36 @@ get '/version' do
 end
 
 get '/load_and_zoom' do
+  case params['changeset_comment']
+  when /place_of_worship.+41666/i
+    treat_church_challenge(params, headers)
+  when /adopteunecommune.+townhall.+42138/i
+    treat_town_hall_challenge3(params, headers)
+  else
+    raise "Don't know how to treat this challenge. #{params['changeset_comment']}"
+  end
+end
+
+def treat_town_hall_challenge3(params, _headers)
+  lon = params['left'].to_f + ((params['right'].to_f - params['left'].to_f) / 2)
+  lat = params['bottom'].to_f + ((params['top'].to_f - params['bottom'].to_f) / 2)
+  insee_code = Insee.new.get_insee_data(lat: lat, lon: lon)[:insee_code]
+
+  overpass_query = <<~QUERY
+    area["ref:INSEE"=#{insee_code}];
+      (nwr(area)[amenity=townhall];);
+    (._;>;);
+    out meta;
+  QUERY
+
+  url = "https://overpass-turbo.eu/map.html?Q=#{CGI.escape(overpass_query)}"
+
+  puts "Opening #{url}"
+  Mixlib::ShellOut.new("xdg-open '#{url}'").run_command.error!
+  {}
+end
+
+def treat_church_challenge(params, headers)
   object_tags_hash = {
     'source:name': 'clochers.org'
   }
