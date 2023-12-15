@@ -82,20 +82,33 @@ def treat_town_hall_challenge3(params, _headers)
     (._;>;);
     out meta;
   QUERY
-  turbo = OverpassTurbo.new
+  turbo_client = OverpassTurboClient.new
 
-  url = turbo.get_url(overpass_query)
+  url = turbo_client.get_map_url(overpass_query)
   puts "Opening #{url}"
   Mixlib::ShellOut.new("xdg-open '#{url}'").run_command.error!
 
-  boundaries = turbo.get_boundaries(overpass_query)
-  puts boundaries
+  object = turbo_client.fetch_data(overpass_query)
+
+  puts '--------------------'
+  puts "\n\n"
+  puts "There are #{object.townhall_count} townhalls in this view"
+  puts "\n\n"
+  puts '--------------------'
 
   proxied_params = params.dup
-  proxied_params.merge!(boundaries)
+  proxied_params.merge!(object.boundaries)
+  changeset_tags = kvize({
+                           mechanical_edit: true,
+                           'script:name': 'adopte-une-commune-assistant',
+                           # 'script:version': SCRIPT_VERSION,
+                           'script:version': '0.2.1',
+                           'script:source': 'https://github.com/kamaradclimber/adopte-une-commune-assistant'
+                         }, separator: '|')
+
+  proxied_params['changeset_tags'] = changeset_tags
   query_string = proxied_params.map { |k, v| "#{k}=#{CGI.escape(v.to_s)}" }.join('&')
   uri = URI.parse("http://localhost:#{CONTROL_PORT}/load_and_zoom?#{query_string}")
-  puts query_string
   proxy_request(headers, uri, json_response: false)
 end
 

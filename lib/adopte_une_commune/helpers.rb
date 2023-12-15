@@ -32,12 +32,12 @@ class Insee
   end
 end
 
-class OverpassTurbo
-  def get_url(query)
+class OverpassTurboClient
+  def get_map_url(query)
     "https://overpass-turbo.eu/map.html?Q=#{CGI.escape(query)}"
   end
 
-  def get_boundaries(query)
+  def fetch_data(query)
     uri = URI.parse('https://overpass-api.de/api/interpreter')
     request = Net::HTTP::Post.new(uri)
     request.set_form_data({ 'data' => query })
@@ -52,9 +52,22 @@ class OverpassTurbo
       puts response.body
       raise "Invalid code when querying overpass turbo. Code was #{response.code}"
     end
-    j = RubyCheerio.new(response.body)
+    OverpassTurboResult.new(response.body)
+  end
+end
 
-    all_nodes = j.find('node')
+class OverpassTurboResult
+  def initialize(body)
+    @body = body
+    @j = RubyCheerio.new(@body)
+  end
+
+  def townhall_count
+    @j.find("[v='townhall']").size
+  end
+
+  def boundaries
+    all_nodes = @j.find('node')
 
     lats = all_nodes.map { |n| n.prop('node', 'lat').to_f }.sort
     lons = all_nodes.map { |n| n.prop('node', 'lon').to_f }.sort
