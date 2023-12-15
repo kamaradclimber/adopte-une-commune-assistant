@@ -56,6 +56,35 @@ class OverpassTurboClient
   end
 end
 
+class Townhall
+  def initialize(way, nodes)
+    @nodes = nodes
+    @way = way
+  end
+
+  def name
+    name_tags = @way.find("[k='name']")
+    case name_tags.size
+    when 1
+      name_tags.first.prop('tag', 'v')
+    when 0
+      raise 'No name for this object?'
+    else
+      raise 'There are several name tags on this object?'
+    end
+  end
+
+  def self.build_from(way, nodes)
+    way_nodes = way.find('nd').map do |nd| # resolve nodes
+      ref = nd.prop('nd', 'ref')
+      n = nodes[ref]
+      puts "WARNING: cant find reference to #{ref}, something is very wrong" unless n
+      n
+    end
+    Townhall.new(way, way_nodes)
+  end
+end
+
 class OverpassTurboResult
   def initialize(body)
     @body = body
@@ -64,6 +93,15 @@ class OverpassTurboResult
 
   def townhall_count
     @j.find("[v='townhall']").size
+  end
+
+  def townhalls
+    nodes = @j.find('node').to_h do |n|
+      [n.prop('node', 'id'), { lat: n.prop('node', 'lat').to_f, lon: n.prop('node', 'lon').to_f }]
+    end
+    @j.find('way').map do |way|
+      Townhall.build_from(way, nodes)
+    end
   end
 
   def boundaries

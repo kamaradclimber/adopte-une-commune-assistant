@@ -90,11 +90,15 @@ def treat_town_hall_challenge3(params, _headers)
 
   object = turbo_client.fetch_data(overpass_query)
 
-  puts '--------------------'
-  puts "\n\n"
+  puts "--------------------\n\n"
   puts "There are #{object.townhall_count} townhalls in this view"
-  puts "\n\n"
-  puts '--------------------'
+
+  ths = object.townhalls
+  puts "There are #{ths.size} non-point townhalls in this view:"
+  ths.each do |th|
+    puts "- #{th.name}"
+  end
+  puts "\n\n--------------------"
 
   proxied_params = params.dup
   proxied_params.merge!(object.boundaries)
