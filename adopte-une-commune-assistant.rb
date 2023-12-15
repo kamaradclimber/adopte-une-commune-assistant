@@ -82,12 +82,21 @@ def treat_town_hall_challenge3(params, _headers)
     (._;>;);
     out meta;
   QUERY
+  turbo = OverpassTurbo.new
 
-  url = "https://overpass-turbo.eu/map.html?Q=#{CGI.escape(overpass_query)}"
-
+  url = turbo.get_url(overpass_query)
   puts "Opening #{url}"
   Mixlib::ShellOut.new("xdg-open '#{url}'").run_command.error!
-  {}
+
+  boundaries = turbo.get_boundaries(overpass_query)
+  puts boundaries
+
+  proxied_params = params.dup
+  proxied_params.merge!(boundaries)
+  query_string = proxied_params.map { |k, v| "#{k}=#{CGI.escape(v.to_s)}" }.join('&')
+  uri = URI.parse("http://localhost:#{CONTROL_PORT}/load_and_zoom?#{query_string}")
+  puts query_string
+  proxy_request(headers, uri, json_response: false)
 end
 
 def treat_church_challenge(params, headers)

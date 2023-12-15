@@ -2,6 +2,7 @@
 
 require 'json'
 require 'net/http'
+require 'ruby-cheerio'
 
 class Insee
   def get_insee_data(lat:, lon:)
@@ -28,5 +29,41 @@ class Insee
                  end
 
     { insee_code: insee_code, department: department }
+  end
+end
+
+class OverpassTurbo
+  def get_url(query)
+    "https://overpass-turbo.eu/map.html?Q=#{CGI.escape(query)}"
+  end
+
+  def get_boundaries(query)
+    uri = URI.parse('https://overpass-api.de/api/interpreter')
+    request = Net::HTTP::Post.new(uri)
+    request.set_form_data({ 'data' => query })
+    req_options = {
+      use_ssl: uri.scheme == 'https'
+    }
+
+    response = Net::HTTP.start(uri.hostname, uri.port, req_options) do |http|
+      http.request(request)
+    end
+    unless response.code.to_i == 200
+      puts response.body
+      raise "Invalid code when querying overpass turbo. Code was #{response.code}"
+    end
+    j = RubyCheerio.new(response.body)
+
+    all_nodes = j.find('node')
+
+    lats = all_nodes.map { |n| n.prop('node', 'lat').to_f }.sort
+    lons = all_nodes.map { |n| n.prop('node', 'lon').to_f }.sort
+
+    {
+      'right' => lons.max,
+      'left' => lons.min,
+      'bottom' => lats.min,
+      'top' => lats.max
+    }
   end
 end
