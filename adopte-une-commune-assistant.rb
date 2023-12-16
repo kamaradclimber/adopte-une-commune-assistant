@@ -77,6 +77,7 @@ def treat_town_hall_challenge3(params, _headers)
   insee_code = Insee.new.get_insee_data(lat: lat, lon: lon)[:insee_code]
 
   overpass_query = <<~QUERY
+    [out:json];
     area["ref:INSEE"=#{insee_code}];
       (nwr(area)[amenity=townhall];);
     (._;>;);
@@ -96,10 +97,11 @@ def treat_town_hall_challenge3(params, _headers)
   ths = object.townhalls
   puts "There are #{ths.size} non-point townhalls in this view:"
   ths.each do |th|
-    puts "- #{th.name}"
+    puts "- #{th.name} #{th.commune_deleguee? ? 'is' : 'is not'} a 'commune déléguée'"
   end
   puts "\n\n--------------------"
 
+  select = ths.map(&:josm_id).join(',')
   proxied_params = params.dup
   proxied_params.merge!(object.boundaries)
   changeset_tags = kvize({
@@ -110,6 +112,7 @@ def treat_town_hall_challenge3(params, _headers)
                            'script:source': 'https://github.com/kamaradclimber/adopte-une-commune-assistant'
                          }, separator: '|')
 
+  proxied_params['select'] = select
   proxied_params['changeset_tags'] = changeset_tags
   query_string = proxied_params.map { |k, v| "#{k}=#{CGI.escape(v.to_s)}" }.join('&')
   uri = URI.parse("http://localhost:#{CONTROL_PORT}/load_and_zoom?#{query_string}")

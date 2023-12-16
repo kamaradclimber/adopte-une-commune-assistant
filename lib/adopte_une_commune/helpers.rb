@@ -54,61 +54,104 @@ class OverpassTurboClient
     end
     OverpassTurboResult.new(response.body)
   end
+
+  def query_bounding_objects(townhall)
+    geom = [townhall.lat * 0.999, townhall.lon * 0.999, townhall.lat * 1.001, townhall.lon * 1.001].map(&:to_s)
+    data = <<~DATA.gsub(/\n/, '')
+      [timeout:10]
+      [out:json];
+      is_in(#{townhall.lat},#{townhall.lon})->.a;
+      way(pivot.a);
+      out tags bb;
+      out ids geom(#{geom.join(',')});
+      relation(pivot.a);
+      out tags bb;
+    DATA
+    fetch_data(data)
+  end
 end
 
 class Townhall
-  def initialize(way, nodes)
+  def initialize(way, nodes, client)
     @nodes = nodes
     @way = way
+    @osm_type = :way
+    @client = client
+  end
+
+  def lat
+    @nodes.first[:lat]
+  end
+
+  def lon
+    @nodes.first[:lon]
+  end
+
+  def _tags
+    @way['tags']
   end
 
   def name
-    name_tags = @way.find("[k='name']")
-    case name_tags.size
-    when 1
-      name_tags.first.prop('tag', 'v')
-    when 0
-      raise 'No name for this object?'
-    else
-      raise 'There are several name tags on this object?'
-    end
+    name_tag = _tags['name']
+    raise 'No name for this object?' unless name_tag
+
+    name_tag
+  end
+
+  def josm_id
+    "#{@osm_type}#{id}"
+  end
+
+  def id
+    @way['id']
+  end
+
+  def bounding_objects
+    @bounding_objects ||= client.query_bounding_objects(self)
+  end
+
+  def commune_deleguee?
+    bounding_objects
+      .data['elements']
+      .select { |el| el['type'] == 'relation' }
+      .any? { |el| el['tags']['admin_type:FR'] == 'commune déléguée' }
   end
 
   def self.build_from(way, nodes)
-    way_nodes = way.find('nd').map do |nd| # resolve nodes
-      ref = nd.prop('nd', 'ref')
+    way_nodes = way['nodes'].map do |ref| # resolve nodes
       n = nodes[ref]
       puts "WARNING: cant find reference to #{ref}, something is very wrong" unless n
       n
     end
-    Townhall.new(way, way_nodes)
+    Townhall.new(way, way_nodes, client)
   end
 end
 
 class OverpassTurboResult
-  def initialize(body)
-    @body = body
-    @j = RubyCheerio.new(@body)
+  def initialize(body, client)
+    @client = client
+    @data = JSON.parse(body)
   end
+  attr_reader :data
 
   def townhall_count
-    @j.find("[v='townhall']").size
+    @data['elements'].count { |el| el['tags']&.fetch('amenity') == 'townhall' }
   end
 
   def townhalls
-    nodes = @j.find('node').to_h do |n|
-      [n.prop('node', 'id'), { lat: n.prop('node', 'lat').to_f, lon: n.prop('node', 'lon').to_f }]
+    nodes = @data['elements'].select { |el| el['type'] == 'node' }.to_h do |n|
+      [n['id'], { lat: n['lat'], lon: n['lon'] }]
     end
-    @j.find('way').map do |way|
-      Townhall.build_from(way, nodes)
+    @data['elements'].select { |el| el['type'] == 'way' }.map do |way|
+      Townhall.build_from(way, nodes, client)
     end
   end
 
   def boundaries
-    all_nodes = @j.find('node')
+    all_nodes = @data['elements'].select { |el| el['type'] == 'node' }
 
-    lats = all_nodes.map { |n| n.prop('node', 'lat').to_f }.sort
-    lons = all_nodes.map { |n| n.prop('node', 'lon').to_f }.sort
+    lats = all_nodes.map { |n| n['lat'] }.sort
+    lons = all_nodes.map { |n| n['lon'] }.sort
 
     {
       'right' => lons.max,
