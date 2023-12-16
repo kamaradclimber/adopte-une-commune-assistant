@@ -52,7 +52,7 @@ class OverpassTurboClient
       puts response.body
       raise "Invalid code when querying overpass turbo. Code was #{response.code}"
     end
-    OverpassTurboResult.new(response.body)
+    OverpassTurboResult.new(response.body, self)
   end
 
   def query_bounding_objects(townhall)
@@ -107,7 +107,7 @@ class Townhall
   end
 
   def bounding_objects
-    @bounding_objects ||= client.query_bounding_objects(self)
+    @bounding_objects ||= @client.query_bounding_objects(self)
   end
 
   def commune_deleguee?
@@ -117,7 +117,7 @@ class Townhall
       .any? { |el| el['tags']['admin_type:FR'] == 'commune déléguée' }
   end
 
-  def self.build_from(way, nodes)
+  def self.build_from(way, nodes, client)
     way_nodes = way['nodes'].map do |ref| # resolve nodes
       n = nodes[ref]
       puts "WARNING: cant find reference to #{ref}, something is very wrong" unless n
@@ -139,11 +139,13 @@ class OverpassTurboResult
   end
 
   def townhalls
-    nodes = @data['elements'].select { |el| el['type'] == 'node' }.to_h do |n|
-      [n['id'], { lat: n['lat'], lon: n['lon'] }]
-    end
-    @data['elements'].select { |el| el['type'] == 'way' }.map do |way|
-      Townhall.build_from(way, nodes, client)
+    @townhalls ||= begin
+      nodes = @data['elements'].select { |el| el['type'] == 'node' }.to_h do |n|
+        [n['id'], { lat: n['lat'], lon: n['lon'] }]
+      end
+      @data['elements'].select { |el| el['type'] == 'way' }.map do |way|
+        Townhall.build_from(way, nodes, @client)
+      end
     end
   end
 

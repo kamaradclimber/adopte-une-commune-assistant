@@ -72,6 +72,7 @@ get '/load_and_zoom' do
 end
 
 def treat_town_hall_challenge3(params, _headers)
+  object_tags_hash = {}
   lon = params['left'].to_f + ((params['right'].to_f - params['left'].to_f) / 2)
   lat = params['bottom'].to_f + ((params['top'].to_f - params['bottom'].to_f) / 2)
   insee_code = Insee.new.get_insee_data(lat: lat, lon: lon)[:insee_code]
@@ -99,6 +100,7 @@ def treat_town_hall_challenge3(params, _headers)
   ths.each do |th|
     puts "- #{th.name} #{th.commune_deleguee? ? 'is' : 'is not'} a 'commune déléguée'"
   end
+  object_tags_hash['townhall:type'] = 'Mairie de commune déléguée' if ths.all?(&:commune_deleguee?)
   puts "\n\n--------------------"
 
   select = ths.map(&:josm_id).join(',')
@@ -112,6 +114,8 @@ def treat_town_hall_challenge3(params, _headers)
                            'script:source': 'https://github.com/kamaradclimber/adopte-une-commune-assistant'
                          }, separator: '|')
 
+  object_tags = kvize(object_tags_hash, separator: '|')
+  proxied_params['addtags'] = object_tags
   proxied_params['select'] = select
   proxied_params['changeset_tags'] = changeset_tags
   query_string = proxied_params.map { |k, v| "#{k}=#{CGI.escape(v.to_s)}" }.join('&')
