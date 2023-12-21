@@ -130,22 +130,24 @@ def treat_town_hall_challenge3(params, _headers)
     if ths.all?(&:commune_deleguee?)
       puts "let's find the main mairie"
       ths.each do |th|
-        if geo_api_gouv_client.find(th) < 0.01
-          puts "#{th.name || '""'} is the main townhall"
-          solved = true
-          patchset = Patchset.new(proxied_params.dup, changeset_tags)
-          patchset.debug_info = "Adding 'mairie principale' tag to #{th.name}"
-          patchsets << patchset
-          patchset.select << th.josm_id
+        name = th.name
+        patchset = Patchset.new(proxied_params.dup, changeset_tags)
+        if geo_api_gouv_client.distance_to_main_townhall(th) < 0.01
+          old_name = th.guess_name('commune déléguée')
+          name ||= th.guess_name('commune nouvelle')
+          puts "#{name || '""'} is the main townhall (old name: #{old_name})"
+          patchset.debug_info = "Adding 'mairie principale' tag to #{name || '""'}"
           patchset.tags['townhall:type'] = 'Mairie principale'
+          solved = true
         else
-          puts "#{th.name || 'no name'} is a delegated townhall"
-          patchset = Patchset.new(proxied_params.dup, changeset_tags)
-          patchset.debug_info = "Adding 'mairie déléguée' tag to #{th.name}"
-          patchsets << patchset
-          patchset.select << th.josm_id
+          name ||= th.guess_name('commune déléguée')
+          puts "#{name || '""'} is a delegated townhall"
+          patchset.debug_info = "Adding 'mairie déléguée' tag to #{name || '""'}"
           patchset.tags['townhall:type'] = 'Mairie de commune déléguée'
         end
+        patchsets << patchset
+        patchset.select << th.josm_id
+        patchset.tags['name'] = "Mairie de #{name}" unless th.name
       end
     end
 

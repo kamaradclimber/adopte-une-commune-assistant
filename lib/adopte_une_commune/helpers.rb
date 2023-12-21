@@ -100,10 +100,7 @@ class Townhall
   end
 
   def name
-    name_tag = _tags['name']
-    puts 'No name for this object?' unless name_tag
-
-    name_tag
+    _tags['name']
   end
 
   def josm_id
@@ -116,6 +113,26 @@ class Townhall
 
   def bounding_objects
     @bounding_objects ||= @client.query_bounding_objects(self)
+  end
+
+  # this should be used when name is not filled
+  def guess_name(admin_type)
+    candidate = bounding_objects
+                .data['elements']
+                .select { |el| el['type'] == 'relation' }
+                .find { |el| el['tags']['admin_type:FR'] == admin_type }
+    return unless candidate
+
+    city_name = candidate['tags']['name']
+    name = 'Mairie '
+    name += case city_name.downcase[0]
+            when /[aeiouyé]/
+              "d'"
+            else
+              'de ' # technically we should probably handle "du Mans" as well
+            end
+    name += city_name
+    name
   end
 
   def commune_deleguee?
@@ -197,7 +214,9 @@ class GeoApiGouvClient
     JSON.parse(response.body)['features']
   end
 
-  def find(townhall)
+  # @returns [Float]
+  def distance_to_main_townhall(townhall)
+    # this works by finding all townhalls from the department (from a list that contains only "official" townhalls, i.e not mairie de commune déléguées)
     insee_data = Insee.new.get_insee_data(lat: townhall.lat, lon: townhall.lon)
     all_townhalls = mairies(insee_data[:department])
     closest = all_townhalls.min_by do |townhall_geodata|
@@ -205,8 +224,9 @@ class GeoApiGouvClient
       Distance.distance_in_km(townhall.lat, townhall.lon, coords[1], coords[0])
     end
     coords = closest['geometry']['coordinates']
-    d = Distance.distance_in_km(townhall.lat, townhall.lon, coords[1], coords[0])
-    puts "Closest townhall is '#{closest['properties']['name']}', #{d}km away"
+    d = Distance.distance_in_km(townhall.lat, townhall.lon, coords[1], coords[0]).round(3)
+    d = d.round(1) if d > 1 # no point in showing too much precision
+    puts "Closest townhall is '#{closest['properties']['nom']}', #{d}km away"
     d
   end
 end
