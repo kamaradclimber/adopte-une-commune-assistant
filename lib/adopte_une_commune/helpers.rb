@@ -183,12 +183,13 @@ class OverpassTurboResult
 
     lats = all_nodes.map { |n| n['lat'] }.sort
     lons = all_nodes.map { |n| n['lon'] }.sort
+    delta = 0.001
 
     {
-      'right' => lons.max,
-      'left' => lons.min,
-      'bottom' => lats.min,
-      'top' => lats.max
+      'right' => lons.max + delta,
+      'left' => lons.min - delta,
+      'bottom' => lats.min - delta,
+      'top' => lats.max + delta
     }
   end
 end

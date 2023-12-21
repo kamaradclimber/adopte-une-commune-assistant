@@ -26,6 +26,7 @@ end
 
 def proxy_request(headers, uri, json_response: true)
   headers['Access-Control-Allow-Origin'] = 'https://maproulette.org'
+  # puts "Proxying to #{uri}"
   response_body = get_page(uri)
 
   if json_response
@@ -106,6 +107,7 @@ def treat_town_hall_challenge3(params, _headers)
   proxied_params.merge!(object.boundaries)
   changeset_tags = kvize({
                            mechanical_edit: true,
+                           source: 'Openstreetmap bounding objects',
                            'script:name': 'adopte-une-commune-assistant',
                            # 'script:version': SCRIPT_VERSION,
                            'script:version': '0.2.1',
@@ -117,7 +119,7 @@ def treat_town_hall_challenge3(params, _headers)
   if object.townhalls.size == 2
     single_point_townhall = object.townhalls.find(&:single_point?)
     others = object.townhalls.reject(&:single_point?)
-    if single_point_townhall.distance_in_km_from(others.first) < 0.100
+    if others.any? && single_point_townhall.distance_in_km_from(others.first) < 0.100
       puts 'Known case: one way and one node representing the same building'
       puts 'You should delete the point version'
       solved = true
