@@ -124,6 +124,7 @@ class Townhall
     return unless candidate
 
     city_name = candidate['tags']['name']
+
     name = 'Mairie '
     name += case city_name.downcase[0]
             when /[aeiouyé]/

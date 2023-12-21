@@ -149,7 +149,7 @@ def treat_town_hall_challenge3(params, _headers)
         end
         patchsets << patchset
         patchset.select << th.josm_id
-        patchset.tags['name'] = "Mairie de #{name}" unless th.name
+        patchset.tags['name'] = name unless th.name
       end
     end
 
