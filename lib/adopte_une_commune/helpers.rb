@@ -72,28 +72,36 @@ class OverpassTurboClient
 end
 
 class Townhall
-  def initialize(way, nodes, client)
+  def initialize(object, nodes, client)
     @nodes = nodes
-    @way = way
-    @osm_type = :way
+    @object = object
+    @osm_type = nodes.one? ? :node : :way
     @client = client
   end
 
+  def distance_in_km_from(th2)
+    Distance.distance_in_km(lat, lon, th2.lat, th2.lon)
+  end
+
   def lat
-    @nodes.first[:lat]
+    @nodes.first['lat']
   end
 
   def lon
-    @nodes.first[:lon]
+    @nodes.first['lon']
   end
 
   def _tags
-    @way['tags']
+    @object['tags']
+  end
+
+  def single_point?
+    @nodes.one?
   end
 
   def name
     name_tag = _tags['name']
-    raise 'No name for this object?' unless name_tag
+    puts 'No name for this object?' unless name_tag
 
     name_tag
   end
@@ -103,7 +111,7 @@ class Townhall
   end
 
   def id
-    @way['id']
+    @object['id']
   end
 
   def bounding_objects
@@ -141,11 +149,15 @@ class OverpassTurboResult
   def townhalls
     @townhalls ||= begin
       nodes = @data['elements'].select { |el| el['type'] == 'node' }.to_h do |n|
-        [n['id'], { lat: n['lat'], lon: n['lon'] }]
+        [n['id'], { 'lat' => n['lat'], 'lon' => n['lon'] }]
       end
-      @data['elements'].select { |el| el['type'] == 'way' }.map do |way|
+      way_ths = @data['elements'].select { |el| el['type'] == 'way' }.map do |way|
         Townhall.build_from(way, nodes, @client)
       end
+      node_ths = @data['elements'].select { |el| el['type'] == 'node' }.select { |el| el['tags']&.fetch('amenity') == 'townhall' }.map do |node|
+        Townhall.new(node, [node], @client)
+      end
+      way_ths + node_ths
     end
   end
 
@@ -161,5 +173,74 @@ class OverpassTurboResult
       'bottom' => lats.min,
       'top' => lats.max
     }
+  end
+end
+
+class GeoApiGouvClient
+  def mairies(department)
+    @mairies ||= {}
+    @mairies[department] ||= _mairies(department)
+  end
+
+  def _mairies(department)
+    uri = URI.parse("https://geo.api.gouv.fr/departements/#{department}/communes?geometry=mairie&format=geojson")
+    request = Net::HTTP::Get.new(uri)
+    req_options = {
+      use_ssl: uri.scheme == 'https'
+    }
+
+    response = Net::HTTP.start(uri.hostname, uri.port, req_options) do |http|
+      http.request(request)
+    end
+    raise "Invalid code when querying townhall list, code: #{response.code}" unless response.code.to_i == 200
+
+    JSON.parse(response.body)['features']
+  end
+
+  def find(townhall)
+    insee_data = Insee.new.get_insee_data(lat: townhall.lat, lon: townhall.lon)
+    all_townhalls = mairies(insee_data[:department])
+    closest = all_townhalls.min_by do |townhall_geodata|
+      coords = townhall_geodata['geometry']['coordinates']
+      Distance.distance_in_km(townhall.lat, townhall.lon, coords[1], coords[0])
+    end
+    coords = closest['geometry']['coordinates']
+    d = Distance.distance_in_km(townhall.lat, townhall.lon, coords[1], coords[0])
+    puts "Closest townhall is '#{closest['properties']['name']}', #{d}km away"
+    d
+  end
+end
+
+module Distance
+  def self.distance_in_km(lat1, lon1, lat2, lon2)
+    earth_radius = 6371
+    p = Math::PI / 180
+    a = 0.5 - (Math.cos((lat2 - lat1) * p) / 2) + (Math.cos(lat1 * p) * Math.cos(lat2 * p) * (1 - Math.cos((lon2 - lon1) * p)) / 2)
+    2 * earth_radius * Math.asin(Math.sqrt(a))
+  end
+end
+
+class Patchset
+  def initialize(params, changeset_tags)
+    @params = params
+    @tags = {}
+    @select = []
+    @changeset_tags = changeset_tags
+  end
+
+  attr_accessor :debug_info
+
+  attr_reader :params, :tags, :select
+
+  def to_request
+    object_tags = kvize(tags, separator: '|')
+    @params['addtags'] = object_tags if object_tags.size.positive?
+    @params['select'] = select.join(',') if select.any?
+    @params['changeset_tags'] = @changeset_tags
+    @params.map { |k, v| "#{k}=#{CGI.escape(v.to_s)}" }.join('&')
+  end
+
+  def kvize(hash, separator: '&')
+    hash.map { |k, v| "#{k}=#{v}" }.join(separator)
   end
 end

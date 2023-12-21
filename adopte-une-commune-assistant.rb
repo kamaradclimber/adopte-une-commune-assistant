@@ -66,13 +66,17 @@ get '/load_and_zoom' do
     treat_church_challenge(params, headers)
   when /adopteunecommune.+townhall.+42138/i
     treat_town_hall_challenge3(params, headers)
+  when /41214/
+    uri = URI.parse(request.env['REQUEST_URI'].gsub(':8111/', ":#{CONTROL_PORT}/"))
+    puts "proxy to #{uri}"
+    proxy_request(headers, uri, json_response: false)
+
   else
     raise "Don't know how to treat this challenge. #{params['changeset_comment']}"
   end
 end
 
 def treat_town_hall_challenge3(params, _headers)
-  object_tags_hash = {}
   lon = params['left'].to_f + ((params['right'].to_f - params['left'].to_f) / 2)
   lat = params['bottom'].to_f + ((params['top'].to_f - params['bottom'].to_f) / 2)
   insee_code = Insee.new.get_insee_data(lat: lat, lon: lon)[:insee_code]
@@ -90,20 +94,14 @@ def treat_town_hall_challenge3(params, _headers)
   puts "Opening #{url}"
   Mixlib::ShellOut.new("xdg-open '#{url}'").run_command.error!
 
+  geo_api_gouv_client = GeoApiGouvClient.new
+
   object = turbo_client.fetch_data(overpass_query)
 
   puts "--------------------\n\n"
-  puts "There are #{object.townhall_count} townhalls in this view"
-
   ths = object.townhalls
-  puts "There are #{ths.size} non-point townhalls in this view:"
-  ths.each do |th|
-    puts "- #{th.name} #{th.commune_deleguee? ? 'is' : 'is not'} a 'commune déléguée'"
-  end
-  object_tags_hash['townhall:type'] = 'Mairie de commune déléguée' if ths.all?(&:commune_deleguee?)
-  puts "\n\n--------------------"
+  puts "There are #{ths.size} townhalls in this view"
 
-  select = ths.map(&:josm_id).join(',')
   proxied_params = params.dup
   proxied_params.merge!(object.boundaries)
   changeset_tags = kvize({
@@ -113,14 +111,70 @@ def treat_town_hall_challenge3(params, _headers)
                            'script:version': '0.2.1',
                            'script:source': 'https://github.com/kamaradclimber/adopte-une-commune-assistant'
                          }, separator: '|')
+  patchsets = []
 
-  object_tags = kvize(object_tags_hash, separator: '|')
-  proxied_params['addtags'] = object_tags
-  proxied_params['select'] = select
-  proxied_params['changeset_tags'] = changeset_tags
-  query_string = proxied_params.map { |k, v| "#{k}=#{CGI.escape(v.to_s)}" }.join('&')
-  uri = URI.parse("http://localhost:#{CONTROL_PORT}/load_and_zoom?#{query_string}")
-  proxy_request(headers, uri, json_response: false)
+  solved = false
+  if object.townhalls.size == 2
+    single_point_townhall = object.townhalls.find(&:single_point?)
+    others = object.townhalls.reject(&:single_point?)
+    if single_point_townhall.distance_in_km_from(others.first) < 0.100
+      puts 'Known case: one way and one node representing the same building'
+      puts 'You should delete the point version'
+      solved = true
+      patchset = Patchset.new(proxied_params.dup, changeset_tags)
+      patchsets << patchset
+      patchset.select << single_point_townhall.josm_id
+    end
+  end
+  unless solved
+    if ths.all?(&:commune_deleguee?)
+      puts "let's find the main mairie"
+      ths.each do |th|
+        if geo_api_gouv_client.find(th) < 0.01
+          puts "#{th.name || '""'} is the main townhall"
+          solved = true
+          patchset = Patchset.new(proxied_params.dup, changeset_tags)
+          patchset.debug_info = "Adding 'mairie principale' tag to #{th.name}"
+          patchsets << patchset
+          patchset.select << th.josm_id
+          patchset.tags['townhall:type'] = 'Mairie principale'
+        else
+          puts "#{th.name || 'no name'} is a delegated townhall"
+          patchset = Patchset.new(proxied_params.dup, changeset_tags)
+          patchset.debug_info = "Adding 'mairie déléguée' tag to #{th.name}"
+          patchsets << patchset
+          patchset.select << th.josm_id
+          patchset.tags['townhall:type'] = 'Mairie de commune déléguée'
+        end
+      end
+    end
+
+    unless solved
+      ths.each do |th|
+        puts "- #{th.name || 'no name'}"
+      end
+      puts 'what should we do with those?'
+    end
+    puts "\n\n--------------------"
+    patchset = Patchset.new(proxied_params.dup, changeset_tags)
+    patchset.debug_info = 'Adding general tags to the changeset'
+    patchsets << patchset
+    ths.each do |th|
+      patchset.select << th.josm_id
+    end
+  end
+
+  patchsets.each_with_index do |p, index|
+    query_string = p.to_request
+    uri = URI.parse("http://localhost:#{CONTROL_PORT}/load_and_zoom?#{query_string}")
+    if patchsets.size > 1
+      print "Creating patchset #{index + 1}  "
+      print ": #{p.debug_info}" if p.debug_info
+      puts ''
+    end
+    proxy_request(headers, uri, json_response: false)
+  end
+  {}.to_json
 end
 
 def treat_church_challenge(params, headers)
