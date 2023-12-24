@@ -17,6 +17,7 @@ require_relative 'lib/adopte_une_commune/osm'
 require_relative 'lib/adopte_une_commune/helpers'
 
 SCRIPT_VERSION = Mixlib::ShellOut.new('git describe --tags --dirty').run_command.tap(&:error!).stdout
+SCRIPT_VERSION = "0.4.0"
 CONTROL_PORT = ENV.fetch('JOSM_CONTROL_PORT', 8112).to_i
 
 if Mixlib::ShellOut.new('which fzf').run_command.error?
@@ -118,8 +119,7 @@ def treat_town_hall_challenge3(params, _headers)
                            mechanical_edit: true,
                            source: 'Openstreetmap bounding objects',
                            'script:name': 'adopte-une-commune-assistant',
-                           # 'script:version': SCRIPT_VERSION,
-                           'script:version': '0.2.1',
+                           'script:version': SCRIPT_VERSION,
                            'script:source': 'https://github.com/kamaradclimber/adopte-une-commune-assistant'
                          }, separator: '|')
   patchsets = []
@@ -128,7 +128,7 @@ def treat_town_hall_challenge3(params, _headers)
   if object.townhalls.size == 2
     single_point_townhall = object.townhalls.find(&:single_point?)
     others = object.townhalls.reject(&:single_point?)
-    if others.any? && single_point_townhall.distance_in_km_from(others.first) < 0.100
+    if single_point_townhall && others.any? && single_point_townhall.distance_in_km_from(others.first) < 0.100
       puts 'Known case: one way and one node representing the same building'
       puts 'You should delete the point version'
       solved = true
@@ -285,8 +285,7 @@ def treat_church_challenge(params, headers)
   changeset_tags = CGI.escape(kvize({
                                       mechanical_edit: true,
                                       'script:name': 'adopte-une-commune-assistant',
-                                      # 'script:version': SCRIPT_VERSION,
-                                      'script:version': '0.2.1',
+                                      'script:version': SCRIPT_VERSION,
                                       'script:source': 'https://github.com/kamaradclimber/adopte-une-commune-assistant'
                                     }, separator: '|'))
   object_tags = CGI.escape(kvize(object_tags_hash, separator: '|'))

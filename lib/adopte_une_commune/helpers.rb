@@ -126,13 +126,16 @@ class Townhall
     city_name = candidate['tags']['name']
 
     name = 'Mairie '
-    name += case city_name.downcase[0]
-            when /[aeiouyé]/
-              "d'"
+    name += case city_name.downcase
+            when /ˆ[aeiouyé]/
+              "d'" + city_name
+            when /le /
+              'du ' + city_name[3..]
+            when /les /
+              'des ' + city_name[4..]
             else
-              'de ' # technically we should probably handle "du Mans" as well
+              'de ' + city_name
             end
-    name += city_name
     name
   end
 
