@@ -139,6 +139,20 @@ class Townhall
     name
   end
 
+  def commune_centre?
+    bounding_objects
+      .data['elements']
+      .select { |el| el['type'] == 'relation' }
+      .any? { |el| el['tags']['admin_type:FR'] == 'commune centre' }
+  end
+
+  def commune_associee?
+    bounding_objects
+      .data['elements']
+      .select { |el| el['type'] == 'relation' }
+      .any? { |el| el['tags']['admin_type:FR'] == 'commune associée' }
+  end
+
   def commune_deleguee?
     bounding_objects
       .data['elements']
