@@ -140,10 +140,13 @@ def treat_town_hall_challenge3(params, _headers)
   unless solved
     if ths.all?(&:commune_deleguee?)
       puts "let's find the main mairie"
+      min_dist = ths.map { |th| geo_api_gouv_client.distance_to_main_townhall(th) }.min
+      # we assume the main townhall to be at most 50m away from "official" townhall location
+      threshold = [min_dist, 0.05].min
       ths.each do |th|
         name = th.name
         patchset = Patchset.new(proxied_params.dup, changeset_tags)
-        if geo_api_gouv_client.distance_to_main_townhall(th) < 0.01
+        if geo_api_gouv_client.distance_to_main_townhall(th) <= threshold
           old_name = th.guess_name('commune déléguée')
           name ||= th.guess_name('commune nouvelle')
           puts "#{name || '""'} is the main townhall (old name: #{old_name})"
