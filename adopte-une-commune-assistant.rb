@@ -24,6 +24,16 @@ if Mixlib::ShellOut.new('which fzf').run_command.error?
   exit(1)
 end
 
+def xdgopen(uri)
+  puts "Opening #{uri}"
+  macos = Mixlib::ShellOut.new("which xdg-open").run_command.error?
+  if macos
+    Mixlib::ShellOut.new("$BROWSER '#{uri}'").run_command.error!
+  else # assuming unix
+    Mixlib::ShellOut.new("xdg-open '#{uri}'").run_command.error!
+  end
+end
+
 def proxy_request(headers, uri, json_response: true)
   headers['Access-Control-Allow-Origin'] = 'https://maproulette.org'
   # puts "Proxying to #{uri}"
@@ -92,8 +102,7 @@ def treat_town_hall_challenge3(params, _headers)
   turbo_client = OverpassTurboClient.new
 
   url = turbo_client.get_map_url(overpass_query)
-  puts "Opening #{url}"
-  Mixlib::ShellOut.new("xdg-open '#{url}'").run_command.error!
+  xdgopen(url)
 
   geo_api_gouv_client = GeoApiGouvClient.new
 
