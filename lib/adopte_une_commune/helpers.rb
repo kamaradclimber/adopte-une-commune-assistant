@@ -100,7 +100,7 @@ class Townhall
   end
 
   def name
-    _tags['name']
+    _tags&.fetch('name', nil)
   end
 
   def josm_id
@@ -127,7 +127,7 @@ class Townhall
 
     name = 'Mairie '
     name += case city_name.downcase
-            when /ˆ[aeiouyé]/
+            when /^[haeiouyé]/
               "d'" + city_name
             when /le /
               'du ' + city_name[3..]
@@ -189,7 +189,7 @@ class OverpassTurboResult
       way_ths = @data['elements'].select { |el| el['type'] == 'way' }.map do |way|
         Townhall.build_from(way, nodes, @client)
       end
-      node_ths = @data['elements'].select { |el| el['type'] == 'node' }.select { |el| el['tags']&.fetch('amenity') == 'townhall' }.map do |node|
+      node_ths = @data['elements'].select { |el| el['type'] == 'node' }.select { |el| el['tags']&.fetch('amenity', nil) == 'townhall' }.map do |node|
         Townhall.new(node, [node], @client)
       end
       way_ths + node_ths
