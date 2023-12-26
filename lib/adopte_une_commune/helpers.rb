@@ -3,6 +3,53 @@
 require 'json'
 require 'net/http'
 require 'ruby-cheerio'
+require 'mixlib/shellout'
+require 'net/http'
+require 'uri'
+require 'irb'
+require 'cgi'
+
+def xdgopen(uri)
+  puts "Opening #{uri}"
+  macos = Mixlib::ShellOut.new("which xdg-open").run_command.error?
+  if macos
+    Mixlib::ShellOut.new("$BROWSER '#{uri}'").run_command.error!
+  else # assuming unix
+    Mixlib::ShellOut.new("xdg-open '#{uri}'").run_command.error!
+  end
+end
+
+def proxy_request(headers, uri, json_response: true)
+  headers['Access-Control-Allow-Origin'] = 'https://maproulette.org'
+  # puts "Proxying to #{uri}"
+  response_body = get_page(uri)
+
+  if json_response
+    JSON.parse(response_body)
+  else
+    response_body
+  end
+end
+
+def kvize(hash, separator: '&')
+  hash.map { |k, v| "#{k}=#{v}" }.join(separator)
+end
+
+def get_page(uri)
+  request = Net::HTTP::Get.new(uri)
+  req_options = {
+    use_ssl: uri.scheme == 'https'
+  }
+
+  response = Net::HTTP.start(uri.hostname, uri.port, req_options) do |http|
+    http.request(request)
+  end
+
+  raise "Code was #{response.code}" unless response.code.to_i == 200
+
+  response.body
+end
+
 
 class Insee
   def get_insee_data(lat:, lon:)
