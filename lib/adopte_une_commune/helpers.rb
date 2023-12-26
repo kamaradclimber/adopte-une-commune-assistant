@@ -138,6 +138,21 @@ class Townhall
     @nodes.first['lon']
   end
 
+  def boundaries
+    all_nodes = @nodes 
+
+    lats = all_nodes.map { |n| n['lat'] }.sort
+    lons = all_nodes.map { |n| n['lon'] }.sort
+    delta = 0.001
+
+    {
+      'right' => lons.max + delta,
+      'left' => lons.min - delta,
+      'bottom' => lats.min - delta,
+      'top' => lats.max + delta
+    }
+  end
+
   def _tags
     @object['tags']
   end
@@ -312,6 +327,23 @@ class Patchset
     @tags = {}
     @select = []
     @changeset_tags = changeset_tags
+  end
+
+  def restrict_boundaries!(object)
+    @params.merge!(object.boundaries)
+  end
+
+  def coords
+    [@params['top'], @params['left'], @params['bottom'], @params['right']]
+  end
+
+  # @return [Float] the area of the patchset in square meters
+  def area
+    left = @params['left'].to_f
+    right = @params['right'].to_f
+    top = @params['top'].to_f
+    bottom = @params['bottom'].to_f
+    Math::PI * 6371**2 * (Math.sin(top) - Math.sin(bottom)) * (right - left) / 180
   end
 
   attr_accessor :debug_info

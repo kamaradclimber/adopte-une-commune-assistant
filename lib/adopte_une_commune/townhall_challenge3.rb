@@ -66,6 +66,7 @@ def treat_town_hall_challenge3(params, _headers)
           puts "#{name || '""'} is the main townhall (old name: #{old_name})"
           patchset.debug_info = "Adding 'mairie principale' tag to #{name || '""'}"
           patchset.tags['townhall:type'] = 'Mairie principale'
+          patchset.restrict_boundaries!(th)
           solved = true
         else
           name ||= th.guess_name('commune déléguée')
@@ -80,6 +81,7 @@ def treat_town_hall_challenge3(params, _headers)
                 end
           patchset.debug_info = "Adding '#{tag}' tag to #{name || '""'}"
           patchset.tags['townhall:type'] = tag
+          patchset.restrict_boundaries!(th)
         end
         patchsets << patchset
         patchset.select << th.josm_id
