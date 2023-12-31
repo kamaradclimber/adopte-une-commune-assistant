@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative 'helpers'
 
 def treat_town_hall_challenge3(params, _headers)
@@ -73,9 +75,9 @@ def treat_town_hall_challenge3(params, _headers)
           name ||= th.guess_name('commune associée')
           puts "#{name || '""'} is a delegated townhall"
           tag = if th.commune_deleguee?
-                  "Mairie de commune déléguée"
+                  'Mairie de commune déléguée'
                 elsif th.commune_associee?
-                  "Mairie de commune associée"
+                  'Mairie de commune associée'
                 else
                   raise "No tag for #{th.inspect}"
                 end
@@ -115,4 +117,3 @@ def treat_town_hall_challenge3(params, _headers)
   end
   {}.to_json
 end
-

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 def treat_church_challenge(params, headers)
   object_tags_hash = {
     'source:name': 'clochers.org'

@@ -19,7 +19,7 @@ require_relative 'lib/adopte_une_commune/townhall_challenge3'
 require_relative 'lib/adopte_une_commune/church_challenge'
 
 SCRIPT_VERSION = Mixlib::ShellOut.new('git describe --tags --dirty').run_command.tap(&:error!).stdout
-SCRIPT_VERSION = "0.4.0"
+SCRIPT_VERSION = '0.4.0'
 CONTROL_PORT = ENV.fetch('JOSM_CONTROL_PORT', 8112).to_i
 
 if Mixlib::ShellOut.new('which fzf').run_command.error?
@@ -48,4 +48,3 @@ get '/load_and_zoom' do
     raise "Don't know how to treat this challenge. #{params['changeset_comment']}"
   end
 end
-

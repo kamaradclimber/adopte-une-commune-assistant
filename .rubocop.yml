@@ -32,3 +32,6 @@ Style/Documentation:
 
 Layout/LineLength:
   Enabled: false
+
+Metrics/BlockNesting:
+  Enabled: false

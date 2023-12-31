@@ -4,14 +4,13 @@ require 'json'
 require 'net/http'
 require 'ruby-cheerio'
 require 'mixlib/shellout'
-require 'net/http'
 require 'uri'
 require 'irb'
 require 'cgi'
 
 def xdgopen(uri)
   puts "Opening #{uri}"
-  macos = Mixlib::ShellOut.new("which xdg-open").run_command.error?
+  macos = Mixlib::ShellOut.new('which xdg-open').run_command.error?
   if macos
     Mixlib::ShellOut.new("$BROWSER '#{uri}'").run_command.error!
   else # assuming unix
@@ -49,7 +48,6 @@ def get_page(uri)
 
   response.body
 end
-
 
 class Insee
   def get_insee_data(lat:, lon:)
@@ -139,7 +137,7 @@ class Townhall
   end
 
   def boundaries
-    all_nodes = @nodes 
+    all_nodes = @nodes
 
     lats = all_nodes.map { |n| n['lat'] }.sort
     lons = all_nodes.map { |n| n['lon'] }.sort
@@ -190,13 +188,13 @@ class Townhall
     name = 'Mairie '
     name += case city_name.downcase
             when /^[haeiouyé]/
-              "d'" + city_name
+              "d'#{city_name}"
             when /le /
-              'du ' + city_name[3..]
+              "du #{city_name[3..]}"
             when /les /
-              'des ' + city_name[4..]
+              "des #{city_name[4..]}"
             else
-              'de ' + city_name
+              "de #{city_name}"
             end
     name
   end
@@ -307,7 +305,6 @@ class GeoApiGouvClient
     coords = closest['geometry']['coordinates']
     d = Distance.distance_in_km(townhall.lat, townhall.lon, coords[1], coords[0]).round(3)
     d = d.round(1) if d > 1 # no point in showing too much precision
-    puts "Closest townhall is '#{closest['properties']['nom']}', #{d}km away"
     d
   end
 end
@@ -343,7 +340,7 @@ class Patchset
     right = @params['right'].to_f
     top = @params['top'].to_f
     bottom = @params['bottom'].to_f
-    Math::PI * 6371**2 * (Math.sin(top) - Math.sin(bottom)) * (right - left) / 180
+    Math::PI * (6371**2) * (Math.sin(top) - Math.sin(bottom)) * (right - left) / 180
   end
 
   attr_accessor :debug_info
