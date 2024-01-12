@@ -2,7 +2,7 @@
 
 require_relative 'helpers'
 
-def treat_town_hall_challenge3(params, _headers)
+def treat_town_hall_challenge3(request, params, _headers)
   lon = params['left'].to_f + ((params['right'].to_f - params['left'].to_f) / 2)
   lat = params['bottom'].to_f + ((params['top'].to_f - params['bottom'].to_f) / 2)
   insee_code = Insee.new.get_insee_data(lat: lat, lon: lon)[:insee_code]
@@ -113,7 +113,7 @@ def treat_town_hall_challenge3(params, _headers)
       print ": #{p.debug_info}" if p.debug_info
       puts ''
     end
-    proxy_request(headers, uri, json_response: false)
+    proxy_request(headers, uri, request, json_response: false)
   end
   {}.to_json
 end

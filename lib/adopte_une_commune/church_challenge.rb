@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-def treat_church_challenge(params, headers)
+def treat_church_challenge(request, params, headers)
   object_tags_hash = {
     'source:name': 'clochers.org'
   }
@@ -67,7 +67,7 @@ def treat_church_challenge(params, headers)
   if church.nil? && churches.any?
     query_string = request.env['rack.request.query_string']
     uri = URI.parse("http://localhost:#{CONTROL_PORT}/load_and_zoom?#{query_string}")
-    proxy_request(headers, uri, json_response: false)
+    proxy_request(headers, uri, request, json_response: false)
     puts "Please select amongst the #{churches.size} possibilities"
     selected_name = `echo -n -e "#{churches.map(&:name).join("\n")}" | fzf`.strip
     puts "Selected '#{selected_name}'"
@@ -100,5 +100,5 @@ def treat_church_challenge(params, headers)
   query_string += "&changeset_tags=#{changeset_tags}"
   query_string += "&addtags=#{object_tags}"
   uri = URI.parse("http://localhost:#{CONTROL_PORT}/load_and_zoom?#{query_string}")
-  proxy_request(headers, uri, json_response: false)
+  proxy_request(headers, uri, request, json_response: false)
 end

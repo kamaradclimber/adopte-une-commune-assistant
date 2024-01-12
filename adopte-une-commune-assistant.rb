@@ -29,20 +29,20 @@ end
 
 get '/version' do
   uri = URI.parse("http://localhost:#{CONTROL_PORT}/version")
-  r = proxy_request(headers, uri)
+  r = proxy_request(headers, uri, request)
   r.merge({ proxied_by: 'adopte-une-commune-assistant' }).to_json
 end
 
 get '/load_and_zoom' do
   case params['changeset_comment']
   when /place_of_worship.+41666/i
-    treat_church_challenge(params, headers)
+    treat_church_challenge(request, params, headers)
   when /adopteunecommune.+townhall.+42138/i
-    treat_town_hall_challenge3(params, headers)
+    treat_town_hall_challenge3(request, params, headers)
   when /41214/
     uri = URI.parse(request.env['REQUEST_URI'].gsub(':8111/', ":#{CONTROL_PORT}/"))
     puts "proxy to #{uri}"
-    proxy_request(headers, uri, json_response: false)
+    proxy_request(headers, uri, request, json_response: false)
 
   else
     raise "Don't know how to treat this challenge. #{params['changeset_comment']}"

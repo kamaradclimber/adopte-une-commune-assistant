@@ -18,8 +18,8 @@ def xdgopen(uri)
   end
 end
 
-def proxy_request(headers, uri, json_response: true)
-  headers['Access-Control-Allow-Origin'] = 'https://maproulette.org'
+def proxy_request(headers, uri, request, json_response: true)
+  headers['Access-Control-Allow-Origin'] = request.fetch_header('HTTP_ORIGIN')
   # puts "Proxying to #{uri}"
   response_body = get_page(uri)
 
